@@ -1,0 +1,13 @@
+streamlit
+pandas
+plotly
+openpyxl
+streamlit-authenticator
+streamlit
+pandas
+numpy
+datetime 
+base64
+io
+matplotlib
+seaborn
