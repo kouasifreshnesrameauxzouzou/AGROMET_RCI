@@ -1,15 +1,54 @@
-streamlit
-pandas
-plotly
-openpyxl
-streamlit-authenticator
-streamlit
-numpy
-io
-matplotlib
-seaborn
-rich
-markdown-it-py
-mdurl
-pygments
-pip
+# AGROMET_RCI - Requirements
+# Application web pour la diffusion d'informations agrométéorologiques
+
+# Framework principal
+streamlit>=1.28.0
+
+# Manipulation de données
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Visualisation de données
+plotly>=5.15.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Gestion des dates et temps
+python-dateutil>=2.8.0
+
+# Traitement d'images et fichiers
+Pillow>=10.0.0
+
+# Utilitaires système
+pathlib2>=2.3.7
+
+# Export PDF (optionnel pour futures fonctionnalités)
+reportlab>=4.0.0
+fpdf2>=2.7.0
+
+# Connexion base de données (optionnel)
+SQLAlchemy>=2.0.0
+pymongo>=4.5.0
+psycopg2-binary>=2.9.0
+
+# API et requêtes web (optionnel)
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Authentification avancée (optionnel)
+streamlit-authenticator>=0.2.3
+bcrypt>=4.0.0
+
+# Traitement de fichiers Excel/CSV
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# Cartes interactives (optionnel pour futures fonctionnalités)
+folium>=0.14.0
+streamlit-folium>=0.15.0
+
+# Performance et cache
+streamlit-extras>=0.3.0
+
+# Variables d'environnement
+python-dotenv>=1.0.0
