@@ -64,8 +64,13 @@ STATIONS_DATA = {
 
 # Fonction d'authentification
 def authenticate_user():
+    # Initialisation des variables de session
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    if 'username' not in st.session_state:
+        st.session_state.username = ""
+    if 'login_attempted' not in st.session_state:
+        st.session_state.login_attempted = False
     
     if not st.session_state.authenticated:
         st.markdown('<div class="main-header"><h1>🌾 AGROMET_RCI</h1><p>Application de diffusion d\'informations agrométéorologiques</p></div>', unsafe_allow_html=True)
@@ -73,17 +78,22 @@ def authenticate_user():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown("### 🔐 Authentification")
-            username = st.text_input("Nom d'utilisateur", placeholder="Entrez votre nom d'utilisateur")
-            password = st.text_input("Mot de passe", type="password", placeholder="Entrez votre mot de passe")
             
-            if st.button("Se connecter", type="primary", use_container_width=True):
-                # Simulation d'authentification (remplacer par une vraie authentification)
-                if username and password:
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    st.rerun()
-                else:
-                    st.error("Veuillez saisir vos identifiants")
+            # Utilisation de form pour éviter les rerun multiples
+            with st.form("login_form"):
+                username = st.text_input("Nom d'utilisateur", placeholder="Entrez votre nom d'utilisateur")
+                password = st.text_input("Mot de passe", type="password", placeholder="Entrez votre mot de passe")
+                submit_button = st.form_submit_button("Se connecter", type="primary", use_container_width=True)
+                
+                if submit_button:
+                    if username and password:
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        st.session_state.login_attempted = True
+                        st.success("✅ Connexion réussie! Redirection en cours...")
+                        st.rerun()
+                    else:
+                        st.error("❌ Veuillez saisir vos identifiants")
         
         # Logo SODEXAM (simulation)
         st.markdown("---")
@@ -136,55 +146,97 @@ def generate_decade_rainfall_data(region):
 # Interface principale
 def main_interface():
     # En-tête de l'application
-    st.markdown(f'<div class="main-header"><h1>🌾 AGROMET_RCI</h1><p>Bienvenue {st.session_state.username} | Informations Agrométéorologiques en Temps Réel</p></div>', unsafe_allow_html=True)
+    username = st.session_state.get('username', 'Utilisateur')
+    st.markdown(f'<div class="main-header"><h1>🌾 AGROMET_RCI</h1><p>Bienvenue {username} | Informations Agrométéorologiques en Temps Réel</p></div>', unsafe_allow_html=True)
     
-    # Bouton de déconnexion
-    if st.sidebar.button("🚪 Se déconnecter"):
-        st.session_state.authenticated = False
+    # Bouton de déconnexion avec confirmation
+    if st.sidebar.button("🚪 Se déconnecter", key="logout_btn"):
+        # Reset des variables de session
+        for key in ['authenticated', 'username', 'login_attempted']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
     
     # Sélection de la région
     st.sidebar.markdown("### 📍 Sélection de la région")
+    
+    # Utilisation de session state pour maintenir les sélections
+    if 'selected_region' not in st.session_state:
+        st.session_state.selected_region = "N'ZI"
+    if 'selected_station' not in st.session_state:
+        st.session_state.selected_station = "Dimbokro"
+    
     selected_region = st.sidebar.selectbox(
         "Choisissez une région:",
         options=list(STATIONS_DATA.keys()),
-        index=0
+        index=list(STATIONS_DATA.keys()).index(st.session_state.selected_region),
+        key="region_select"
     )
+    
+    # Mise à jour de la station si la région change
+    if selected_region != st.session_state.selected_region:
+        st.session_state.selected_region = selected_region
+        st.session_state.selected_station = list(STATIONS_DATA[selected_region].keys())[0]
     
     # Sélection de la station
     stations = list(STATIONS_DATA[selected_region].keys())
+    try:
+        station_index = stations.index(st.session_state.selected_station)
+    except ValueError:
+        station_index = 0
+        st.session_state.selected_station = stations[0]
+    
     selected_station = st.sidebar.selectbox(
         "Choisissez une station:",
         options=stations,
-        index=0
+        index=station_index,
+        key="station_select"
     )
+    
+    st.session_state.selected_station = selected_station
     
     # Menu de navigation
     st.sidebar.markdown("### 📊 Navigation")
     menu_options = [
         "📊 Paramètres Météo Journaliers",
-        "🌧️ Situation Pluviométrique",
+        "🌧️ Situation Pluviométrique", 
         "📅 Prévision Saisonnière",
         "💧 Satisfaction en Eau des Cultures",
         "🌍 Réserve en Eau du Sol",
         "💡 Avis et Conseils"
     ]
     
-    selected_menu = st.sidebar.radio("", menu_options, index=0)
+    # Maintenir la sélection du menu
+    if 'selected_menu_index' not in st.session_state:
+        st.session_state.selected_menu_index = 0
+    
+    selected_menu = st.sidebar.radio(
+        "", 
+        menu_options, 
+        index=st.session_state.selected_menu_index,
+        key="menu_radio"
+    )
+    
+    # Mettre à jour l'index du menu sélectionné
+    st.session_state.selected_menu_index = menu_options.index(selected_menu)
     
     # Affichage du contenu selon le menu sélectionné
-    if selected_menu == "📊 Paramètres Météo Journaliers":
-        show_daily_weather(selected_region, selected_station)
-    elif selected_menu == "🌧️ Situation Pluviométrique":
-        show_rainfall_situation(selected_region)
-    elif selected_menu == "📅 Prévision Saisonnière":
-        show_seasonal_forecast(selected_region)
-    elif selected_menu == "💧 Satisfaction en Eau des Cultures":
-        show_crop_water_satisfaction(selected_region)
-    elif selected_menu == "🌍 Réserve en Eau du Sol":
-        show_soil_water_reserve(selected_region)
-    elif selected_menu == "💡 Avis et Conseils":
-        show_advice_and_recommendations(selected_region)
+    try:
+        if selected_menu == "📊 Paramètres Météo Journaliers":
+            show_daily_weather(selected_region, selected_station)
+        elif selected_menu == "🌧️ Situation Pluviométrique":
+            show_rainfall_situation(selected_region)
+        elif selected_menu == "📅 Prévision Saisonnière":
+            show_seasonal_forecast(selected_region)
+        elif selected_menu == "💧 Satisfaction en Eau des Cultures":
+            show_crop_water_satisfaction(selected_region)
+        elif selected_menu == "🌍 Réserve en Eau du Sol":
+            show_soil_water_reserve(selected_region)
+        elif selected_menu == "💡 Avis et Conseils":
+            show_advice_and_recommendations(selected_region)
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement du contenu: {str(e)}")
+        st.info("🔄 Veuillez rafraîchir la page ou sélectionner un autre menu.")
 
 def show_daily_weather(region, station):
     st.header(f"📊 Paramètres Météorologiques Journaliers - {station}")
@@ -543,9 +595,15 @@ def show_advice_and_recommendations(region):
     # Téléchargement des recommandations
     st.markdown("### 📥 Télécharger les Recommandations")
     
-    if st.button("📄 Générer le bulletin PDF", type="primary"):
-        st.success("✅ Bulletin PDF généré avec succès!")
-        st.info("💾 Le fichier sera disponible dans votre espace de téléchargement.")
+    # Utilisation d'un container pour éviter les problèmes de rerun
+    with st.container():
+        if st.button("📄 Générer le bulletin PDF", type="primary", key="pdf_button"):
+            with st.spinner("⏳ Génération du bulletin en cours..."):
+                # Simulation du temps de génération
+                import time
+                time.sleep(1)
+                st.success("✅ Bulletin PDF généré avec succès!")
+                st.info("💾 Le fichier sera disponible dans votre espace de téléchargement.")
 
 # Point d'entrée principal
 def main():
