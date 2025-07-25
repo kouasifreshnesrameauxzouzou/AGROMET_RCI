@@ -14,3 +14,4 @@ rich
 markdown-it-py
 mdurl
 pygments
+pip
