@@ -5,8 +5,6 @@ openpyxl
 streamlit-authenticator
 streamlit
 numpy
-datetime 
-base64
 io
 matplotlib
 seaborn
