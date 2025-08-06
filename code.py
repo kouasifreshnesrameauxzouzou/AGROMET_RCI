@@ -1,4 +1,9 @@
-import streamlit as st
+folium_map = create_folium_heatmap(
+            water_satisfaction_data, 
+            "💧 Satisfaction en Eau des Cultures", 
+            colormap='RdYlGn',
+            unit="%",
+            mapimport streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -10,6 +15,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import folium
 from folium import plugins
+import streamlit.components.v1 as components
 import json
 
 # Configuration de la page
@@ -545,12 +551,12 @@ def show_daily_weather(region, station):
         
         folium_map = create_folium_heatmap(
             precipitation_data, 
-            "Précipitations Journalières", 
+            "🌧️ Précipitations Journalières", 
             colormap='Blues',
             unit=" mm",
             map_type="precipitation"
         )
-        display_folium_map(folium_map, height=400)
+        display_folium_map(folium_map, height=450, key="daily_precip_map")
 
 def show_rainfall_situation(region):
     st.header(f"🌧️ Situation Pluviométrique - Région {region}")
@@ -600,12 +606,12 @@ def show_rainfall_situation(region):
     
     folium_map = create_folium_heatmap(
         regional_rainfall, 
-        "Précipitations Cumulées Mensuelles", 
+        "🌧️ Précipitations Cumulées Mensuelles", 
         colormap='Blues',
         unit=" mm",
         map_type="precipitation"
     )
-    display_folium_map(folium_map, height=500)
+    display_folium_map(folium_map, height=550, key="rainfall_situation_map")
     
     # Tableau des écarts
     st.subheader("📋 Écarts par rapport à la normale")
@@ -629,12 +635,12 @@ def show_seasonal_forecast(region):
         
         folium_map = create_folium_heatmap(
             seasonal_precipitation_data, 
-            "Prévisions Précipitations Saisonnières", 
+            "📅 Prévisions Précipitations Saisonnières", 
             colormap='RdYlBu_r',
             unit=" mm",
             map_type="precipitation"
         )
-        display_folium_map(folium_map, height=450)
+        display_folium_map(folium_map, height=500, key="seasonal_forecast_map")
         
         # Graphique temporel des prévisions mensuelles
         months = ['Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre']
