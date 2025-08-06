@@ -8,6 +8,9 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 import seaborn as sns
+import folium
+from folium import plugins
+import json
 
 # Configuration de la page
 st.set_page_config(
@@ -44,6 +47,11 @@ st.markdown("""
         padding: 15px;
         border-radius: 8px;
         margin: 5px;
+    }
+    .folium-map {
+        border: 2px solid #2E8B57;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -102,21 +110,58 @@ STATIONS_DATA = {
     }
 }
 
-# Fonction pour créer une carte de chaleur de la Côte d'Ivoire
-def create_cote_divoire_heatmap(data_dict, title, colorscale='RdYlBu_r', unit=""):
-    # Coordonnées approximatives des frontières de la Côte d'Ivoire
-    # Points pour tracer les contours du pays
-    cote_divoire_outline = {
-        'lat': [4.357, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.7, 10.7, 10.2, 9.5, 8.5, 7.5, 6.5, 5.5, 4.5, 4.357],
-        'lon': [-7.5, -7.0, -7.5, -8.0, -8.2, -7.8, -6.5, -5.5, -2.5, -2.5, -2.8, -3.2, -3.0, -2.5, -3.0, -4.0, -7.5]
-    }
+# Coordonnées des frontières de la Côte d'Ivoire pour créer un polygone
+COTE_DIVOIRE_BOUNDS = [
+    [10.740197, -2.494897],  # Nord-Est
+    [10.740197, -8.599302],  # Nord-Ouest  
+    [4.357067, -8.599302],   # Sud-Ouest
+    [4.357067, -2.494897],   # Sud-Est
+    [10.740197, -2.494897]   # Retour au point de départ
+]
+
+# Fonction pour créer une belle carte thermique avec Folium
+def create_folium_heatmap(data_dict, title, colormap='RdYlBu_r', unit="", map_type="temperature"):
+    # Centre de la Côte d'Ivoire
+    center_lat, center_lon = 7.5, -5.5
+    
+    # Créer la carte de base avec un style moderne
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=7,
+        tiles=None,
+        prefer_canvas=True
+    )
+    
+    # Ajouter différentes couches de fond
+    folium.TileLayer('OpenStreetMap', name='OpenStreetMap').add_to(m)
+    folium.TileLayer('CartoDB Positron', name='CartoDB Positron').add_to(m)
+    folium.TileLayer('CartoDB Dark_Matter', name='CartoDB Dark').add_to(m)
+    
+    # Utiliser CartoDB Positron par défaut pour un look propre
+    folium.TileLayer('CartoDB Positron').add_to(m)
     
     # Préparer les données pour la carte
-    regions = []
-    lats = []
-    lons = []
-    values = []
-    texts = []
+    heat_data = []
+    markers_data = []
+    
+    # Déterminer les valeurs min et max pour la normalisation des couleurs
+    values = list(data_dict.values())
+    min_val = min(values)
+    max_val = max(values)
+    
+    # Choisir la palette de couleurs selon le type de données
+    color_palettes = {
+        'temperature': ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', 
+                       '#ffffcc', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'],
+        'precipitation': ['#ffffff', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', 
+                         '#2171b5', '#08519c', '#08306b', '#041f47', '#021238'],
+        'humidity': ['#f7fcf0', '#e0f3db', '#ccebc5', '#a8ddb5', '#7bccc4', 
+                    '#4eb3d3', '#2b8cbe', '#0868ac', '#084081', '#042753'],
+        'water_satisfaction': ['#8c2d04', '#cc4c02', '#ec7014', '#fe9929', '#fec44f', 
+                              '#fee391', '#fff7bc', '#c7e9b4', '#7fcdbb', '#41b6c4', '#2c7fb8']
+    }
+    
+    palette = color_palettes.get(map_type, color_palettes['temperature'])
     
     for region, value in data_dict.items():
         if region in STATIONS_DATA:
@@ -124,73 +169,129 @@ def create_cote_divoire_heatmap(data_dict, title, colorscale='RdYlBu_r', unit=""
             station_name = list(STATIONS_DATA[region].keys())[0]
             station_data = STATIONS_DATA[region][station_name]
             
-            regions.append(region)
-            lats.append(station_data['lat'])
-            lons.append(station_data['lon'])
-            values.append(value)
-            texts.append(f"{region}<br>{value}{unit}")
-    
-    # Créer la figure
-    fig = go.Figure()
-    
-    # Ajouter le contour de la Côte d'Ivoire
-    fig.add_trace(go.Scattergeo(
-        lon=cote_divoire_outline['lon'],
-        lat=cote_divoire_outline['lat'],
-        mode='lines',
-        line=dict(width=2, color='black'),
-        name='Frontières',
-        showlegend=False
-    ))
-    
-    # Ajouter la carte de chaleur avec des marqueurs
-    fig.add_trace(go.Scattergeo(
-        lon=lons,
-        lat=lats,
-        text=texts,
-        mode='markers',
-        marker=dict(
-            size=25,
-            color=values,
-            colorscale=colorscale,
-            showscale=True,
-            colorbar=dict(
-                title=dict(
-                    text=unit,
-                    side="right"
+            lat, lon = station_data['lat'], station_data['lon']
+            
+            # Normaliser la valeur pour la carte de chaleur
+            normalized_value = (value - min_val) / (max_val - min_val) if max_val != min_val else 0.5
+            heat_data.append([lat, lon, normalized_value])
+            
+            # Déterminer la couleur du marqueur basée sur la valeur
+            color_index = int(normalized_value * (len(palette) - 1))
+            marker_color = palette[color_index]
+            
+            # Créer un marqueur avec style personnalisé
+            icon_color = 'white' if normalized_value > 0.5 else 'black'
+            
+            # Choisir l'icône selon le type de données
+            icons = {
+                'temperature': 'thermometer-half',
+                'precipitation': 'tint',
+                'humidity': 'eye-dropper',
+                'water_satisfaction': 'leaf'
+            }
+            icon_name = icons.get(map_type, 'info-sign')
+            
+            # Popup avec informations détaillées
+            popup_html = f"""
+            <div style='font-family: Arial, sans-serif; width: 200px;'>
+                <h4 style='color: #2E8B57; margin-bottom: 10px;'>{region}</h4>
+                <p><strong>Station:</strong> {station_name}</p>
+                <p><strong>{title.split('-')[-1].strip()}:</strong> 
+                   <span style='font-size: 18px; font-weight: bold; color: #d73027;'>
+                   {value}{unit}
+                   </span>
+                </p>
+                <p><strong>Coordonnées:</strong> {lat:.3f}°N, {abs(lon):.3f}°W</p>
+            </div>
+            """
+            
+            folium.Marker(
+                location=[lat, lon],
+                popup=folium.Popup(popup_html, max_width=250),
+                tooltip=f"{region}: {value}{unit}",
+                icon=folium.Icon(
+                    color='red' if normalized_value > 0.7 else 'orange' if normalized_value > 0.4 else 'green',
+                    icon=icon_name,
+                    prefix='fa'
                 )
-            ),
-            line=dict(width=1, color='black')
-        ),
-        hovertemplate='<b>%{text}</b><extra></extra>',
-        name='Données régionales'
-    ))
+            ).add_to(m)
+            
+            # Ajouter un cercle coloré pour l'effet thermique
+            circle_color = marker_color
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=20 + (normalized_value * 30),  # Taille variable selon la valeur
+                popup=f"{region}: {value}{unit}",
+                color='white',
+                weight=2,
+                fillColor=circle_color,
+                fillOpacity=0.7
+            ).add_to(m)
     
-    # Configuration de la mise en page
-    fig.update_layout(
-        title=dict(
-            text=title,
-            x=0.5,
-            font=dict(size=16)
-        ),
-        geo=dict(
-            projection_type='mercator',
-            showland=True,
-            landcolor='lightgray',
-            showocean=True,
-            oceancolor='lightblue',
-            showlakes=True,
-            lakecolor='lightblue',
-            center=dict(lat=7.5, lon=-5.5),
-            lonaxis=dict(range=[-8.5, -2.0]),
-            lataxis=dict(range=[4.0, 11.0]),
-            bgcolor='white'
-        ),
-        height=500,
-        showlegend=False
-    )
+    # Ajouter une carte de chaleur en arrière-plan
+    if heat_data:
+        plugins.HeatMap(
+            heat_data,
+            min_opacity=0.2,
+            max_zoom=10,
+            radius=50,
+            blur=40,
+            gradient={
+                0.0: '#313695',
+                0.2: '#4575b4', 
+                0.4: '#abd9e9',
+                0.6: '#fee090',
+                0.8: '#f46d43',
+                1.0: '#a50026'
+            }
+        ).add_to(m)
     
-    return fig
+    # Ajouter une légende personnalisée
+    legend_html = f'''
+    <div style="position: fixed; 
+                top: 10px; right: 10px; width: 200px; height: auto;
+                background-color: white; border:2px solid grey; z-index:9999;
+                font-size:14px; padding: 10px; border-radius: 10px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+    <p style="margin: 0 0 10px 0;"><strong>{title}</strong></p>
+    <p style="margin: 0;"><i class="fa fa-circle" style="color:#a50026"></i> Élevé ({max_val:.1f}{unit})</p>
+    <p style="margin: 0;"><i class="fa fa-circle" style="color:#f46d43"></i> Moyen-Élevé</p>
+    <p style="margin: 0;"><i class="fa fa-circle" style="color:#fee090"></i> Moyen</p>
+    <p style="margin: 0;"><i class="fa fa-circle" style="color:#abd9e9"></i> Moyen-Faible</p>
+    <p style="margin: 0;"><i class="fa fa-circle" style="color:#313695"></i> Faible ({min_val:.1f}{unit})</p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
+    
+    # Ajouter un contrôle des couches
+    folium.LayerControl().add_to(m)
+    
+    # Ajouter un plugin de mesure
+    plugins.MeasureControl().add_to(m)
+    
+    # Ajouter la position de la souris
+    plugins.MousePosition().add_to(m)
+    
+    # Limiter la vue à la Côte d'Ivoire
+    m.fit_bounds([[4.0, -8.6], [10.8, -2.4]])
+    
+    return m
+
+# Fonction pour afficher une carte Folium dans Streamlit
+def display_folium_map(folium_map, height=500):
+    """Fonction pour afficher une carte Folium dans Streamlit avec un style personnalisé"""
+    map_html = folium_map._repr_html_()
+    
+    # Ajouter du CSS personnalisé pour la carte
+    styled_html = f"""
+    <div class="folium-map" style="border: 3px solid #2E8B57; border-radius: 15px; overflow: hidden; box-shadow: 0 6px 12px rgba(0,0,0,0.3);">
+        <div style="height: {height}px;">
+            {map_html}
+        </div>
+    </div>
+    """
+    
+    st.components.v1.html(styled_html, height=height + 20)
 
 # Fonction d'authentification
 def authenticate_user():
@@ -435,19 +536,21 @@ def show_daily_weather(region, station):
         st.plotly_chart(fig_temp, use_container_width=True)
     
     with col2:
-        # Carte des précipitations journalières pour toutes les régions
+        # Carte Folium des précipitations journalières
+        st.subheader("🌧️ Précipitations Journalières par Région")
         precipitation_data = {}
         np.random.seed(42)
         for reg in STATIONS_DATA.keys():
             precipitation_data[reg] = round(np.random.uniform(0, 50), 1)
         
-        fig_rain_map = create_cote_divoire_heatmap(
+        folium_map = create_folium_heatmap(
             precipitation_data, 
-            "🌧️ Précipitations Journalières par Région", 
-            colorscale='Blues',
-            unit=" mm"
+            "Précipitations Journalières", 
+            colormap='Blues',
+            unit=" mm",
+            map_type="precipitation"
         )
-        st.plotly_chart(fig_rain_map, use_container_width=True)
+        display_folium_map(folium_map, height=400)
 
 def show_rainfall_situation(region):
     st.header(f"🌧️ Situation Pluviométrique - Région {region}")
@@ -488,6 +591,22 @@ def show_rainfall_situation(region):
     
     st.plotly_chart(fig, use_container_width=True)
     
+    # Carte Folium de la situation pluviométrique
+    st.subheader("🗺️ Situation Pluviométrique Régionale")
+    regional_rainfall = {}
+    np.random.seed(123)
+    for reg in STATIONS_DATA.keys():
+        regional_rainfall[reg] = round(np.random.uniform(20, 200), 1)
+    
+    folium_map = create_folium_heatmap(
+        regional_rainfall, 
+        "Précipitations Cumulées Mensuelles", 
+        colormap='Blues',
+        unit=" mm",
+        map_type="precipitation"
+    )
+    display_folium_map(folium_map, height=500)
+    
     # Tableau des écarts
     st.subheader("📋 Écarts par rapport à la normale")
     rainfall_data['Écart (%)'] = round((rainfall_data['Pluie observée (mm)'] - rainfall_data['Moyenne 30 ans (mm)']) / rainfall_data['Moyenne 30 ans (mm)'] * 100, 1)
@@ -501,19 +620,21 @@ def show_seasonal_forecast(region):
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Carte des prévisions saisonnières de précipitations
+        # Carte Folium des prévisions saisonnières de précipitations
+        st.subheader("🌧️ Prévisions Saisonnières - Précipitations Cumulées")
         seasonal_precipitation_data = {}
         np.random.seed(100)
         for reg in STATIONS_DATA.keys():
             seasonal_precipitation_data[reg] = round(np.random.uniform(800, 1800), 0)
         
-        fig_seasonal_map = create_cote_divoire_heatmap(
+        folium_map = create_folium_heatmap(
             seasonal_precipitation_data, 
-            "🌧️ Prévisions Saisonnières - Précipitations Cumulées", 
-            colorscale='RdYlBu_r',
-            unit=" mm"
+            "Prévisions Précipitations Saisonnières", 
+            colormap='RdYlBu_r',
+            unit=" mm",
+            map_type="precipitation"
         )
-        st.plotly_chart(fig_seasonal_map, use_container_width=True)
+        display_folium_map(folium_map, height=450)
         
         # Graphique temporel des prévisions mensuelles
         months = ['Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre']
@@ -565,19 +686,21 @@ def show_crop_water_satisfaction(region):
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Carte de satisfaction en eau des cultures par région
+        # Carte Folium de satisfaction en eau des cultures par région
+        st.subheader("💧 Satisfaction en Eau des Cultures par Région")
         water_satisfaction_data = {}
         np.random.seed(50)
         for reg in STATIONS_DATA.keys():
             water_satisfaction_data[reg] = round(np.random.uniform(45, 95), 0)
         
-        fig_water_map = create_cote_divoire_heatmap(
+        folium_map = create_folium_heatmap(
             water_satisfaction_data, 
-            "💧 Niveau de Satisfaction en Eau des Cultures par Région", 
-            colorscale='RdYlGn',
-            unit="%"
+            "Satisfaction en Eau des Cultures", 
+            colormap='RdYlGn',
+            unit="%",
+            map_type="water_satisfaction"
         )
-        st.plotly_chart(fig_water_map, use_container_width=True)
+        display_folium_map(folium_map, height=450)
         
         # Graphique par stade de développement pour la région sélectionnée
         stages = ['Début croissance', 'Croissance végétative', 'Phase reproductive']
@@ -630,6 +753,22 @@ def show_soil_water_reserve(region):
     col1, col2 = st.columns([2, 1])
     
     with col1:
+        # Carte Folium de la réserve en eau du sol
+        st.subheader("🗺️ Réserve en Eau du Sol par Région")
+        soil_water_data = {}
+        np.random.seed(75)
+        for reg in STATIONS_DATA.keys():
+            soil_water_data[reg] = round(np.random.uniform(30, 95), 0)
+        
+        folium_map = create_folium_heatmap(
+            soil_water_data, 
+            "Réserve en Eau du Sol", 
+            colormap='Blues',
+            unit="%",
+            map_type="humidity"
+        )
+        display_folium_map(folium_map, height=450)
+        
         # Graphique de l'évolution de la réserve en eau
         fig = go.Figure()
         
