@@ -1,9 +1,4 @@
-folium_map = create_folium_heatmap(
-            water_satisfaction_data, 
-            "💧 Satisfaction en Eau des Cultures", 
-            colormap='RdYlGn',
-            unit="%",
-            mapimport streamlit as st
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -922,3 +917,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
