@@ -155,8 +155,10 @@ def create_cote_divoire_heatmap(data_dict, title, colorscale='RdYlBu_r', unit=""
             colorscale=colorscale,
             showscale=True,
             colorbar=dict(
-                title=unit,
-                titleside="right"
+                title=dict(
+                    text=unit,
+                    side="right"
+                )
             ),
             line=dict(width=1, color='black')
         ),
