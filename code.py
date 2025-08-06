@@ -48,7 +48,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Données de stations par région
+# Données étendues de stations par région avec coordonnées géographiques
 STATIONS_DATA = {
     "N'ZI": {
         "Dimbokro": {"lat": 6.65, "lon": -4.7},
@@ -59,8 +59,136 @@ STATIONS_DATA = {
         "Gagnoa": {"lat": 6.133333, "lon": -5.95},
         "Ouragahio": {"lat": 6.316667, "lon": -5.933333},
         "Oumé": {"lat": 6.366667, "lon": -5.416667}
+    },
+    "LAGUNES": {
+        "Abidjan": {"lat": 5.359952, "lon": -4.008256},
+        "Grand-Bassam": {"lat": 5.200833, "lon": -3.738889},
+        "Dabou": {"lat": 5.325, "lon": -4.376667}
+    },
+    "SASSANDRA-MARAHOUÉ": {
+        "Daloa": {"lat": 6.877222, "lon": -6.450833},
+        "Bouaflé": {"lat": 6.988889, "lon": -5.745556},
+        "Zuénoula": {"lat": 7.426667, "lon": -6.053333}
+    },
+    "VALLÉE DU BANDAMA": {
+        "Bouaké": {"lat": 7.690556, "lon": -5.030556},
+        "Katiola": {"lat": 8.135833, "lon": -5.106944},
+        "Béoumi": {"lat": 7.673889, "lon": -5.580556}
+    },
+    "MONTAGNES": {
+        "Man": {"lat": 7.412222, "lon": -7.553056},
+        "Danané": {"lat": 7.264167, "lon": -8.151944},
+        "Biankouma": {"lat": 7.744722, "lon": -7.620833}
+    },
+    "SAVANES": {
+        "Korhogo": {"lat": 9.458056, "lon": -5.629167},
+        "Boundiali": {"lat": 9.520833, "lon": -6.489722},
+        "Ferkessédougou": {"lat": 9.590833, "lon": -5.195833}
+    },
+    "ZANZAN": {
+        "Bondoukou": {"lat": 8.040278, "lon": -2.798611},
+        "Tanda": {"lat": 7.803056, "lon": -3.168611},
+        "Bouna": {"lat": 9.273611, "lon": -2.996667}
+    },
+    "COMOÉ": {
+        "Abengourou": {"lat": 6.729167, "lon": -3.496944},
+        "Agnibilékrou": {"lat": 7.123611, "lon": -3.200833},
+        "Bettié": {"lat": 6.235, "lon": -3.173333}
+    },
+    "LACS": {
+        "Yamoussoukro": {"lat": 6.820556, "lon": -5.276667},
+        "Tiébissou": {"lat": 7.158333, "lon": -5.223056},
+        "Toumodi": {"lat": 6.557222, "lon": -5.018333}
     }
 }
+
+# Fonction pour créer une carte de chaleur de la Côte d'Ivoire
+def create_cote_divoire_heatmap(data_dict, title, colorscale='RdYlBu_r', unit=""):
+    # Coordonnées approximatives des frontières de la Côte d'Ivoire
+    # Points pour tracer les contours du pays
+    cote_divoire_outline = {
+        'lat': [4.357, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.7, 10.7, 10.2, 9.5, 8.5, 7.5, 6.5, 5.5, 4.5, 4.357],
+        'lon': [-7.5, -7.0, -7.5, -8.0, -8.2, -7.8, -6.5, -5.5, -2.5, -2.5, -2.8, -3.2, -3.0, -2.5, -3.0, -4.0, -7.5]
+    }
+    
+    # Préparer les données pour la carte
+    regions = []
+    lats = []
+    lons = []
+    values = []
+    texts = []
+    
+    for region, value in data_dict.items():
+        if region in STATIONS_DATA:
+            # Utiliser la première station comme point représentatif de la région
+            station_name = list(STATIONS_DATA[region].keys())[0]
+            station_data = STATIONS_DATA[region][station_name]
+            
+            regions.append(region)
+            lats.append(station_data['lat'])
+            lons.append(station_data['lon'])
+            values.append(value)
+            texts.append(f"{region}<br>{value}{unit}")
+    
+    # Créer la figure
+    fig = go.Figure()
+    
+    # Ajouter le contour de la Côte d'Ivoire
+    fig.add_trace(go.Scattergeo(
+        lon=cote_divoire_outline['lon'],
+        lat=cote_divoire_outline['lat'],
+        mode='lines',
+        line=dict(width=2, color='black'),
+        name='Frontières',
+        showlegend=False
+    ))
+    
+    # Ajouter la carte de chaleur avec des marqueurs
+    fig.add_trace(go.Scattergeo(
+        lon=lons,
+        lat=lats,
+        text=texts,
+        mode='markers',
+        marker=dict(
+            size=25,
+            color=values,
+            colorscale=colorscale,
+            showscale=True,
+            colorbar=dict(
+                title=unit,
+                titleside="right"
+            ),
+            line=dict(width=1, color='black')
+        ),
+        hovertemplate='<b>%{text}</b><extra></extra>',
+        name='Données régionales'
+    ))
+    
+    # Configuration de la mise en page
+    fig.update_layout(
+        title=dict(
+            text=title,
+            x=0.5,
+            font=dict(size=16)
+        ),
+        geo=dict(
+            projection_type='mercator',
+            showland=True,
+            landcolor='lightgray',
+            showocean=True,
+            oceancolor='lightblue',
+            showlakes=True,
+            lakecolor='lightblue',
+            center=dict(lat=7.5, lon=-5.5),
+            lonaxis=dict(range=[-8.5, -2.0]),
+            lataxis=dict(range=[4.0, 11.0]),
+            bgcolor='white'
+        ),
+        height=500,
+        showlegend=False
+    )
+    
+    return fig
 
 # Fonction d'authentification
 def authenticate_user():
@@ -305,12 +433,19 @@ def show_daily_weather(region, station):
         st.plotly_chart(fig_temp, use_container_width=True)
     
     with col2:
-        # Graphique des précipitations
-        fig_rain = go.Figure(data=[
-            go.Bar(x=weather_data['Date'], y=weather_data['Précipitations (mm)'], marker_color='lightblue')
-        ])
-        fig_rain.update_layout(title="🌧️ Précipitations Journalières", xaxis_title="Date", yaxis_title="Précipitations (mm)")
-        st.plotly_chart(fig_rain, use_container_width=True)
+        # Carte des précipitations journalières pour toutes les régions
+        precipitation_data = {}
+        np.random.seed(42)
+        for reg in STATIONS_DATA.keys():
+            precipitation_data[reg] = round(np.random.uniform(0, 50), 1)
+        
+        fig_rain_map = create_cote_divoire_heatmap(
+            precipitation_data, 
+            "🌧️ Précipitations Journalières par Région", 
+            colorscale='Blues',
+            unit=" mm"
+        )
+        st.plotly_chart(fig_rain_map, use_container_width=True)
 
 def show_rainfall_situation(region):
     st.header(f"🌧️ Situation Pluviométrique - Région {region}")
@@ -361,18 +496,31 @@ def show_seasonal_forecast(region):
     
     st.info("📋 Prévisions pour la saison agricole 2024-2025")
     
-    # Carte simulée de prévisions
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Graphique de prévision saisonnière
+        # Carte des prévisions saisonnières de précipitations
+        seasonal_precipitation_data = {}
+        np.random.seed(100)
+        for reg in STATIONS_DATA.keys():
+            seasonal_precipitation_data[reg] = round(np.random.uniform(800, 1800), 0)
+        
+        fig_seasonal_map = create_cote_divoire_heatmap(
+            seasonal_precipitation_data, 
+            "🌧️ Prévisions Saisonnières - Précipitations Cumulées", 
+            colorscale='RdYlBu_r',
+            unit=" mm"
+        )
+        st.plotly_chart(fig_seasonal_map, use_container_width=True)
+        
+        # Graphique temporel des prévisions mensuelles
         months = ['Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre']
         precipitation_forecast = [120, 180, 200, 250, 180, 100]
         temperature_forecast = [28, 26, 25, 24, 26, 29]
         
-        fig = go.Figure()
+        fig_timeline = go.Figure()
         
-        fig.add_trace(go.Bar(
+        fig_timeline.add_trace(go.Bar(
             name='Précipitations (mm)',
             x=months,
             y=precipitation_forecast,
@@ -380,7 +528,7 @@ def show_seasonal_forecast(region):
             marker_color='lightblue'
         ))
         
-        fig.add_trace(go.Scatter(
+        fig_timeline.add_trace(go.Scatter(
             name='Température (°C)',
             x=months,
             y=temperature_forecast,
@@ -389,14 +537,14 @@ def show_seasonal_forecast(region):
             marker_color='red'
         ))
         
-        fig.update_layout(
-            title="📈 Prévisions Saisonnières",
+        fig_timeline.update_layout(
+            title="📈 Évolution Mensuelle des Prévisions",
             xaxis_title="Mois",
             yaxis=dict(title="Précipitations (mm)", side="left"),
             yaxis2=dict(title="Température (°C)", side="right", overlaying="y")
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_timeline, use_container_width=True)
     
     with col2:
         st.markdown("### 🎯 Tendances Attendues")
@@ -412,15 +560,29 @@ def show_seasonal_forecast(region):
 def show_crop_water_satisfaction(region):
     st.header(f"💧 Niveau de Satisfaction en Eau des Cultures - Région {region}")
     
-    # Simulation des stades de développement du riz
-    stages = ['Début croissance (Kc=0.3-0.5)', 'Croissance végétative (Kc=0.8)', 'Phase reproductive (Kc=1.2)']
-    satisfaction_levels = [85, 72, 91]  # Pourcentages de satisfaction
-    
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Graphique en barres des niveaux de satisfaction
-        fig = go.Figure(data=[
+        # Carte de satisfaction en eau des cultures par région
+        water_satisfaction_data = {}
+        np.random.seed(50)
+        for reg in STATIONS_DATA.keys():
+            water_satisfaction_data[reg] = round(np.random.uniform(45, 95), 0)
+        
+        fig_water_map = create_cote_divoire_heatmap(
+            water_satisfaction_data, 
+            "💧 Niveau de Satisfaction en Eau des Cultures par Région", 
+            colorscale='RdYlGn',
+            unit="%"
+        )
+        st.plotly_chart(fig_water_map, use_container_width=True)
+        
+        # Graphique par stade de développement pour la région sélectionnée
+        stages = ['Début croissance', 'Croissance végétative', 'Phase reproductive']
+        satisfaction_levels = [water_satisfaction_data.get(region, 75) + np.random.randint(-10, 10) for _ in range(3)]
+        satisfaction_levels = [max(0, min(100, level)) for level in satisfaction_levels]  # Limiter entre 0 et 100
+        
+        fig_stages = go.Figure(data=[
             go.Bar(
                 x=stages,
                 y=satisfaction_levels,
@@ -430,25 +592,26 @@ def show_crop_water_satisfaction(region):
             )
         ])
         
-        fig.update_layout(
-            title="📊 Satisfaction en Eau par Stade",
+        fig_stages.update_layout(
+            title=f"📊 Satisfaction en Eau par Stade - {region}",
             xaxis_title="Stades de Développement",
             yaxis_title="Niveau de Satisfaction (%)",
             yaxis=dict(range=[0, 100])
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_stages, use_container_width=True)
     
     with col2:
         st.markdown("### 🌾 État des Cultures")
         
-        for i, (stage, level) in enumerate(zip(stages, satisfaction_levels)):
+        kc_values = ['(Kc=0.3-0.5)', '(Kc=0.8)', '(Kc=1.2)']
+        for i, (stage, level, kc) in enumerate(zip(stages, satisfaction_levels, kc_values)):
             if level >= 80:
-                st.success(f"✅ **{stage.split('(')[0]}**: {level}% - Excellent")
+                st.success(f"✅ **{stage} {kc}**: {level}% - Excellent")
             elif level >= 60:
-                st.warning(f"⚠️ **{stage.split('(')[0]}**: {level}% - Correct")
+                st.warning(f"⚠️ **{stage} {kc}**: {level}% - Correct")
             else:
-                st.error(f"❌ **{stage.split('(')[0]}**: {level}% - Insuffisant")
+                st.error(f"❌ **{stage} {kc}**: {level}% - Insuffisant")
         
         st.markdown("### 📅 Dates de Semis Recommandées")
         st.info("🌱 **Semis précoce**: 15-30 Mai 2024")
